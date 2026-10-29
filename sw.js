@@ -1,5 +1,5 @@
 // オフライン用のキャッシュ。アプリを更新したら VERSION を変える。
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'plot-editor-' + VERSION;
 const ASSETS = [
   './',

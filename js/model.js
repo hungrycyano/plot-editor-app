@@ -90,6 +90,18 @@ export function newState() {
   };
 }
 
+// テンプレート：4部（起承転結）・各3章・各1節・各節3エピソード（計36）の空の枠
+export function templateState() {
+  const s = newState();
+  s.structure.parts = TEMPLATES['起承転結'].map(name => {
+    const p = newPart(name);
+    p.chapters = [newChapter(), newChapter(), newChapter()];
+    return p;
+  });
+  for (const x of allSections(s)) for (let i = 0; i < 3; i++) s.episodes.push(newEpisode(x.sec.id));
+  return s;
+}
+
 export function newCharacter() {
   const c = { id: uid('c'), name: '' };
   for (const [k] of [...CHAR_LINE_FIELDS, ...CHAR_TEXT_FIELDS]) c[k] = '';

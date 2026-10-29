@@ -292,7 +292,30 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .pv td small { color: var(--muted); display: block; }
 .pv td .prose { font-size: 14px; line-height: 1.6; }
 .pv-sec { color: var(--muted); font-size: 13px !important; }
-.list-sec { font-size: 13px; font-weight: 600; color: var(--accent); margin: 12px 0 4px; border-bottom: 1px solid var(--line); }
+.list-sec { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--accent); margin: 12px 0 4px; border-bottom: 1px solid var(--line); min-height: 22px; }
+/* エピソード一覧の伏線・回収・エンジンの丸（節の行の右端。行は増やさない） */
+.dots { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; flex: none; max-width: 60%; }
+.dot {
+  width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; color: #fff; font-size: 10px; font-weight: 700; line-height: 18px;
+  text-align: center; cursor: pointer; flex: none;
+}
+.dot.fs { background: var(--fs); }
+.dot.pay { background: var(--pay); }
+.dot.eng { background: var(--eng); }
+.dot.during { background: none; color: var(--eng); border: 1.5px dotted var(--eng); line-height: 15px; }
+@media (prefers-color-scheme: dark) { .dot { color: #1c1d1f; } }
+.label-pop {
+  position: fixed; z-index: 1500; width: min(320px, calc(100vw - 16px)); max-height: 60vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.2); padding: 8px 10px; font-size: 14px;
+}
+.label-pop.fs { border-top-color: var(--fs); }
+.label-pop.pay { border-top-color: var(--pay); }
+.label-pop.eng { border-top-color: var(--eng); }
+.label-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.label-pop dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 6px 0 0; }
+.label-pop dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
+.label-pop dd { margin: 0; }
 .list-item { border-bottom: 1px dotted var(--line); }
 .list-item > summary { padding: 6px 2px; cursor: pointer; }
 .list-item .prose { padding: 4px 8px 10px 2.4em; }

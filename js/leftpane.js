@@ -181,19 +181,74 @@ function renderList(root) {
     button('すべて閉じる', () => { s.episodes.forEach(e => setOpen('list:' + e.id, false)); store.refresh(); }, 'small'),
   ));
   if (!s.episodes.length) root.append(h('p', { class: 'note' }, 'エピソードがありません。'));
-  let last;
-  for (const e of s.episodes) {
-    if (e.sectionId !== last) {
-      last = e.sectionId;
-      root.append(h('div', { class: 'list-sec' }, sectionName(map.get(e.sectionId))));
-    }
+  const labels = labelsBySection(s);
+  const item = e => {
     const key = 'list:' + e.id;
     const d = h('details', { class: 'list-item', open: isOpen(key) },
       h('summary', null, h('span', { class: 'num' }, pad3(nums.get(e.id))), ' ', e.title || '（無題）'),
       e.body ? prose(e.body) : h('p', { class: 'note' }, '（本文なし）'));
     d.addEventListener('toggle', () => setOpen(key, d.open));
-    root.append(d);
+    return d;
+  };
+  // 節ごと（エピソードかラベルがある節だけ）。節の行の右端に伏線・回収・エンジンの丸を付ける
+  for (const x of allSections(s)) {
+    const eps = s.episodes.filter(e => e.sectionId === x.sec.id);
+    const ls = labels.get(x.sec.id) || [];
+    if (!eps.length && !ls.length) continue;
+    root.append(h('div', { class: 'list-sec' },
+      h('span', { class: 'grow' }, sectionName(x)),
+      ls.length ? h('span', { class: 'dots' }, ls.map(l => labelDot(l, map))) : null));
+    eps.forEach(e => root.append(item(e)));
   }
+  const unplaced = s.episodes.filter(e => !e.sectionId);
+  if (unplaced.length) {
+    root.append(h('div', { class: 'list-sec' }, sectionName(null)));
+    unplaced.forEach(e => root.append(item(e)));
+  }
+}
+
+// ラベルの小さな丸（伏＝オレンジ、回＝緑、エ＝紫）。押すと説明を表示する
+const DOT = {
+  setup: ['fs', '伏', '伏線'],
+  payoff: ['pay', '回', '回収'],
+  from: ['eng', 'エ', 'エンジン開始'],
+  during: ['eng during', 'エ', 'エンジン継続'],
+  to: ['eng', 'エ', 'エンジン終了'],
+};
+
+function labelDot(l, map) {
+  const [cls, ch, name] = DOT[l.type];
+  const it = l.item;
+  const title = `${name}「${it.label || '（無題）'}」`;
+  return h('button', {
+    type: 'button', class: 'dot ' + cls, title, 'aria-label': title,
+    onclick: e => { e.stopPropagation(); showLabelInfo(e.currentTarget, l, map); },
+  }, ch);
+}
+
+function showLabelInfo(anchor, l, map) {
+  document.querySelector('.label-pop')?.remove();
+  const it = l.item;
+  const where = id => (id ? sectionName(map.get(id)) : '未配置');
+  const [cls, , name] = DOT[l.type];
+  const rows = 'kind' in it
+    ? [['種類', it.kind], ['範囲', `${where(it.from)} 〜 ${where(it.to)}`], ['内容', it.content]]
+    : [['伏線', it.setup], ['伏線の場所', where(it.setupAt)], ['回収', it.payoff], ['回収の場所', where(it.payoffAt)]];
+  const pop = h('div', { class: 'label-pop ' + cls },
+    h('div', { class: 'label-pop-head' }, h('strong', null, `${name}「${it.label || '（無題）'}」`),
+      h('button', { type: 'button', class: 'icon small', title: '閉じる', onclick: () => pop.remove() }, '×')),
+    h('dl', null, rows.map(([k, v]) => [h('dt', null, k), h('dd', { class: 'pre' }, v || '（未入力）')])));
+  document.body.append(pop);
+  const r = anchor.getBoundingClientRect();
+  const w = pop.offsetWidth;
+  pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  pop.style.top = Math.min(r.bottom + 4, innerHeight - pop.offsetHeight - 8) + 'px';
+  const close = ev => {
+    if (pop.contains(ev.target)) return;
+    pop.remove();
+    document.removeEventListener('pointerdown', close, true);
+  };
+  setTimeout(() => document.addEventListener('pointerdown', close, true), 0);
 }
 
 // ---------- ネット検索 ----------
@@ -204,6 +259,18 @@ const ENGINES = [
   ['thesaurus', 'Weblio類語辞典', q => `https://thesaurus.weblio.jp/content/${encodeURIComponent(q)}`],
 ];
 
+// 画面の右半分くらいの別ウインドウで開く。2回目以降は同じウインドウを使う
+function openSearchWindow(url) {
+  const sw = screen.availWidth, sh = screen.availHeight;
+  const w = Math.round(sw / 2), hgt = Math.round(sh * 0.85);
+  const left = (screen.availLeft || 0) + sw - w, top = (screen.availTop || 0) + Math.round((sh - hgt) / 2);
+  const win = window.open('', 'plot-editor-search', `popup,width=${w},height=${hgt},left=${left},top=${top}`);
+  if (!win) { window.open(url, '_blank', 'noopener'); return; }
+  try { win.opener = null; } catch { /* 開いた先とつながりを切れなくても続ける */ }
+  win.location.href = url;
+  win.focus();
+}
+
 function renderSearch(root) {
   const input = h('input', { type: 'search', placeholder: '調べたい言葉', enterKeyHint: 'search' });
   const engine = h('select', { value: ui.searchEngine, onchange: e => { ui.searchEngine = e.target.value; saveUi(); } },
@@ -212,16 +279,16 @@ function renderSearch(root) {
     const q = input.value.trim();
     if (!q) return input.focus();
     const [, , url] = ENGINES.find(([k]) => k === engine.value) || ENGINES[0];
-    window.open(url(q), '_blank', 'noopener');
+    openSearchWindow(url(q));
   };
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
   root.append(
     h('div', { class: 'form' },
       h('label', { class: 'field wide' }, h('span', { class: 'field-label' }, '検索する言葉'), input),
       h('label', { class: 'field wide' }, h('span', { class: 'field-label' }, '検索サイト'), engine),
-      h('div', { class: 'wide' }, button('新しいタブで開く ↗', go, 'primary')),
+      h('div', { class: 'wide' }, button('別ウインドウで開く ↗', go, 'primary')),
     ),
-    h('p', { class: 'note' }, '検索結果は、いま使っているブラウザ（Brave / Chrome など）の新しいタブで開きます。アプリ内には表示しません。'),
+    h('p', { class: 'note' }, '検索結果は、画面の右半分くらいの大きさの別ウインドウで開きます（続けて検索すると同じウインドウに表示します）。iPhone では新しいタブで開きます。アプリ内には表示しません。'),
   );
 }
 
